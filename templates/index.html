@@ -1,0 +1,164 @@
+k<!DOCTYPE html>
+<html>
+<head>
+    <title>AML/BSA Compliance Intelligence</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh; padding: 20px;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        .header { 
+            background: white; padding: 30px; border-radius: 12px; 
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1); margin-bottom: 30px;
+        }
+        .header h1 { color: #1e3a8a; font-size: 32px; }
+        .controls { 
+            background: white; padding: 25px; border-radius: 12px; 
+            margin-bottom: 30px; display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px;
+        }
+        .control-group label { 
+            color: #475569; font-size: 14px; font-weight: 600; 
+            margin-bottom: 8px; display: block;
+        }
+        .control-group select { 
+            width: 100%; padding: 12px; border: 2px solid #e2e8f0; 
+            border-radius: 8px; background: white;
+        }
+        .refresh-btn { 
+            padding: 12px 24px; background: #3b82f6; color: white; 
+            border: none; border-radius: 8px; cursor: pointer;
+        }
+        .update-card { 
+            background: white; border-radius: 12px; padding: 25px; 
+            margin-bottom: 20px; border-left: 4px solid #3b82f6;
+        }
+        .regulator-badge { 
+            background: #3b82f6; color: white; padding: 6px 12px; 
+            border-radius: 6px; font-size: 12px; display: inline-block;
+        }
+        .update-title { 
+            color: #1e293b; font-size: 20px; font-weight: 600; 
+            margin: 15px 0;
+        }
+        .update-analysis { color: #475569; line-height: 1.7; white-space: pre-wrap; }
+        .loading { text-align: center; padding: 60px; color: white; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>AML/BSA Compliance Intelligence</h1>
+            <p>Real-time regulatory monitoring for large financial institutions</p>
+        </div>
+
+        <div class="controls">
+            <div class="control-group">
+                <label>Regulator</label>
+                <select id="regulatorFilter">
+                    <option value="all">All Regulators</option>
+                    {% for code, config in regulators.items() %}
+                    <option value="{{ config.name }}">{{ config.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label>Type</label>
+                <select id="typeFilter">
+                    <option value="all">All Types</option>
+                    <option value="traditional">Traditional AML</option>
+                    <option value="digital">Digital Assets</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label>Category</label>
+                <select id="categoryFilter">
+                    <option value="all">All Categories</option>
+                    {% for code, name in categories.items() %}
+                    <option value="{{ code }}">{{ name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <button class="refresh-btn" onclick="manualRefresh()">Refresh Now</button>
+        </div>
+
+        <div id="updatesContainer">
+            <div class="loading">Loading updates...</div>
+        </div>
+    </div>
+
+    <script>
+        let currentFilters = { regulator: 'all', type: 'all', category: 'all' };
+
+        function fetchUpdates() {
+            const params = new URLSearchParams(currentFilters);
+            fetch('/api/updates?' + params)
+                .then(response => response.json())
+                .then(data => displayUpdates(data))
+                .catch(error => {
+                    console.error('Error:', error);
+                    document.getElementById('updatesContainer').innerHTML = 
+                        '<div class="loading">Error loading updates</div>';
+                });
+        }
+
+        function displayUpdates(data) {
+            const container = document.getElementById('updatesContainer');
+            
+            if (!data.updates || data.updates.length === 0) {
+                container.innerHTML = '<div class="loading">No updates found</div>';
+                return;
+            }
+
+            const html = data.updates.map(item => {
+                const categories = item.categories || [];
+                const categoryTags = categories.map(cat => 
+                    '<span style="display: inline-block; background: #dbeafe; color: #1e40af; padding: 4px 10px; border-radius: 12px; font-size: 11px; margin-right: 6px; margin-bottom: 6px; font-weight: 600;">' + cat + '</span>'
+                ).join('');
+                
+                return '<div class="update-card">' +
+                    '<span class="regulator-badge">' + item.regulator + '</span>' +
+                    '<div style="margin: 10px 0;">' + categoryTags + '</div>' +
+                    '<div class="update-title">' + item.update.title + '</div>' +
+                    '<div class="update-analysis">' + item.analysis + '</div>' +
+                    '<p><a href="' + item.update.link + '" target="_blank">View Full Update</a></p>' +
+                '</div>';
+            }).join('');
+
+            container.innerHTML = html;
+        }
+
+        function manualRefresh() {
+            document.getElementById('updatesContainer').innerHTML = 
+                '<div class="loading">Scanning sources...</div>';
+            fetch('/api/refresh').then(() => setTimeout(fetchUpdates, 5000));
+        }
+
+        document.getElementById('regulatorFilter').addEventListener('change', (e) => {
+            currentFilters.regulator = e.target.value;
+            fetchUpdates();
+        });
+
+        document.getElementById('typeFilter').addEventListener('change', (e) => {
+            currentFilters.type = e.target.value;
+            fetchUpdates();
+        });
+
+        document.getElementById('categoryFilter').addEventListener('change', (e) => {
+            currentFilters.category = e.target.value;
+            fetchUpdates();
+        });
+
+        fetchUpdates();
+        setInterval(fetchUpdates, 300000);
+    </script>
+</body>
+</html>
