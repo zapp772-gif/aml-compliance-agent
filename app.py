@@ -54,8 +54,8 @@ def run_daily_scan():
     print("\nScan completed\n")
 
 def schedule_daily_scans():
-    """Schedule daily scans at 8 AM"""
-    schedule.every().day.at("08:00").do(run_daily_scan)
+    """Schedule daily scans at 8 AM EST (13:00 UTC)"""
+    schedule.every().day.at("13:00").do(run_daily_scan)
     
     while True:
         schedule.run_pending()
@@ -100,10 +100,23 @@ def manual_refresh():
     threading.Thread(target=run_daily_scan, daemon=True).start()
     return jsonify({'status': 'Scan initiated'})
 
-if __name__ == '__main__':
-    threading.Thread(target=run_daily_scan, daemon=True).start()
-    scheduler_thread = threading.Thread(target=schedule_daily_scans, daemon=True)
-    scheduler_thread.start()
+# Start background tasks when module loads (works with gunicorn)
+def start_background_tasks():
+    """Initialize background tasks on app startup"""
+    print("Initializing background tasks...")
     
+    # Run initial scan
+    threading.Thread(target=run_daily_scan, daemon=True).start()
+    
+    # Start scheduler
+    threading.Thread(target=schedule_daily_scans, daemon=True).start()
+    
+    print("Background tasks started")
+
+# Start tasks when app loads
+start_background_tasks()
+
+if __name__ == '__main__':
+    # This only runs locally, not on Render with gunicorn
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
