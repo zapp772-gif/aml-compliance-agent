@@ -100,22 +100,6 @@ def manual_refresh():
     threading.Thread(target=run_daily_scan, daemon=True).start()
     return jsonify({'status': 'Scan initiated'})
 
-# Start background tasks when module loads (works with gunicorn)
-def start_background_tasks():
-    """Initialize background tasks on app startup"""
-    print("Initializing background tasks...")
-    
-    # Run initial scan
-    threading.Thread(target=run_daily_scan, daemon=True).start()
-    
-    # Start scheduler
-    threading.Thread(target=schedule_daily_scans, daemon=True).start()
-    
-    print("Background tasks started")
-
-# Start tasks when app loads
-start_background_tasks()
-
 if __name__ == '__main__':
     # This only runs locally, not on Render with gunicorn
     port = int(os.environ.get('PORT', 5000))
