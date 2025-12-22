@@ -1,11 +1,8 @@
 """
-Email service for daily compliance summaries
+Email service for daily compliance summaries using SendGrid
 """
 
 import os
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 from datetime import datetime
 from dotenv import load_dotenv
 
@@ -13,10 +10,8 @@ load_dotenv()
 
 class EmailService:
     def __init__(self):
-        self.smtp_server = os.getenv('SMTP_SERVER', 'smtp.gmail.com')
-        self.smtp_port = int(os.getenv('SMTP_PORT', 587))
+        self.sendgrid_api_key = os.getenv('SENDGRID_API_KEY')
         self.email_address = os.getenv('EMAIL_ADDRESS')
-        self.email_password = os.getenv('EMAIL_PASSWORD')
     
     def create_html_email(self, analyzed_updates):
         """Create formatted HTML email"""
@@ -58,7 +53,6 @@ class EmailService:
                 update = item['update']
                 categories = item.get('categories', [])
                 
-                # Create category tags
                 category_tags = ''.join([f'<span class="category-tag">{cat}</span>' for cat in categories])
                 
                 html_content += f"""
@@ -80,24 +74,46 @@ class EmailService:
         return html_content
     
     def send_daily_summary(self, analyzed_updates):
-        """Send daily summary email"""
+        """Send daily summary email using SendGrid"""
         try:
-            msg = MIMEMultipart('alternative')
-            msg['Subject'] = f"AML/BSA Update - {datetime.now().strftime('%B %d, %Y')}"
-            msg['From'] = self.email_address
-            msg['To'] = self.email_address
+            import requests
+            
+            url = "https://api.sendgrid.com/v3/mail/send"
+            
+            headers = {
+                "Authorization": f"Bearer {self.sendgrid_api_key}",
+                "Content-Type": "application/json"
+            }
             
             html_body = self.create_html_email(analyzed_updates)
-            html_part = MIMEText(html_body, 'html')
-            msg.attach(html_part)
             
-            with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
-                server.starttls()
-                server.login(self.email_address, self.email_password)
-                server.send_message(msg)
+            payload = {
+                "personalizations": [
+                    {
+                        "to": [{"email": self.email_address}],
+                        "subject": f"AML/BSA Compliance Update - {datetime.now().strftime('%B %d, %Y')}"
+                    }
+                ],
+                "from": {
+                    "email": self.email_address,
+                    "name": "AML Compliance Agent"
+                },
+                "content": [
+                    {
+                        "type": "text/html",
+                        "value": html_body
+                    }
+                ]
+            }
             
-            print(f"✓ Email sent to {self.email_address}")
-            return True
+            response = requests.post(url, json=payload, headers=headers, timeout=10)
+            
+            if response.status_code == 202:
+                print(f"✓ Email sent to {self.email_address}")
+                return True
+            else:
+                print(f"✗ Email error: {response.status_code} - {response.text}")
+                return False
             
         except Exception as e:
             print(f"✗ Email error: {str(e)}")
